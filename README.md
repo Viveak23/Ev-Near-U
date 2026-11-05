@@ -142,3 +142,25 @@ Visit **`http://localhost:5173`** in your browser.
 - `POST /`: Submit 5-star review for completed session
 - `GET /charger/:chargerId`: Fetch verified community reviews
 - `PUT /:id/response`: Host reply to a review
+
+---
+
+## 🌐 Production Cloud Deployment (Render + MongoDB Atlas)
+
+EvNearU includes a pre-configured `render.yaml` blueprint for one-click unified deployment:
+
+1. **Push to GitHub**:
+   ```bash
+   git remote add origin https://github.com/<YOUR_USERNAME>/ev-near-u.git
+   git push -u origin main
+   ```
+2. **Set up MongoDB Atlas**:
+   - Create a free **M0 cluster** at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+   - Add database user and whitelist `0.0.0.0/0`.
+   - Copy your connection string (`mongodb+srv://...`).
+3. **Deploy on Render**:
+   - In [Render Dashboard](https://render.com), click **New +** → **Blueprint**.
+   - Select your repo; Render will detect `render.yaml`.
+   - Set `MONGODB_URI` environment variable with your Atlas URI.
+   - Click **Apply**. Render will automatically build the Vite frontend, install backend dependencies, and boot the server at `https://<service-name>.onrender.com`.
+
