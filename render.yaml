@@ -4,6 +4,8 @@ services:
     runtime: node
     region: singapore
     plan: free
+    branch: main
+    healthCheckPath: /health
     rootDir: ./
     buildCommand: cd client && npm install && npm run build && cd ../server && npm install
     startCommand: cd server && npm start
