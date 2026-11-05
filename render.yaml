@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: evnearu
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: ./
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: PLATFORM_FEE_PERCENT
+        value: "5"
+      - key: HOST_COMMISSION_PERCENT
+        value: "10"
+      - key: TAX_GST_PERCENT
+        value: "18"
