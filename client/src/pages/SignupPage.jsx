@@ -53,6 +53,12 @@ export const SignupPage = () => {
     if (code === 'auth/invalid-email') {
       return 'Please enter a valid email address.';
     }
+    if (code === 'auth/operation-not-allowed') {
+      return 'This sign-in provider is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.';
+    }
+    if (code === 'auth/billing-not-enabled') {
+      return 'Firebase requires billing enabled for real SMS, or add testing phone numbers in Firebase Console.';
+    }
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
       return '';
     }

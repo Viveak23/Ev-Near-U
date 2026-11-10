@@ -75,6 +75,12 @@ export const LoginPage = () => {
     if (code === 'auth/invalid-phone-number') {
       return 'Please enter a valid phone number with country code (e.g. +91 98765 43210).';
     }
+    if (code === 'auth/operation-not-allowed') {
+      return 'Phone provider is not enabled in Firebase Console. Please enable Phone in Firebase > Authentication > Sign-in method.';
+    }
+    if (code === 'auth/billing-not-enabled') {
+      return 'Firebase requires the Blaze plan for sending real SMS, OR add your number under "Phone numbers for testing" in Firebase Console for free instant OTP.';
+    }
     if (code === 'auth/popup-closed-by-user') {
       return '';
     }
