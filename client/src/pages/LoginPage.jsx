@@ -52,7 +52,7 @@ export const LoginPage = () => {
   }, [countdown]);
 
   // Clean Firebase Auth error messages
-  const formatAuthError = (err) => {
+  const formatAuthError = (err, context = 'general') => {
     const code = err.code || '';
     if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
       return 'Invalid email or password. Please check your credentials and try again.';
@@ -76,15 +76,18 @@ export const LoginPage = () => {
       return 'Please enter a valid phone number with country code (e.g. +91 98765 43210).';
     }
     if (code === 'auth/operation-not-allowed') {
-      return 'Phone provider is not enabled in Firebase Console. Please enable Phone in Firebase > Authentication > Sign-in method.';
+      if (context === 'google') {
+        return 'Google Sign-In is not enabled yet in your Firebase Console. Please enable Google in Firebase > Authentication > Sign-in method.';
+      }
+      if (context === 'phone') {
+        return 'Phone provider is not enabled in Firebase Console. Please enable Phone in Firebase > Authentication > Sign-in method.';
+      }
+      return 'This sign-in method is not enabled in your Firebase Console. Please enable it under Authentication > Sign-in method.';
     }
     if (code === 'auth/billing-not-enabled') {
       return 'Firebase requires the Blaze plan for sending real SMS, OR add your number under "Phone numbers for testing" in Firebase Console for free instant OTP.';
     }
-    if (code === 'auth/popup-closed-by-user') {
-      return '';
-    }
-    if (code === 'auth/cancelled-popup-request') {
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
       return '';
     }
     if (code === 'auth/popup-blocked') {
@@ -101,7 +104,7 @@ export const LoginPage = () => {
       await loginWithGoogle();
       navigate(redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`);
     } catch (err) {
-      const msg = formatAuthError(err);
+      const msg = formatAuthError(err, 'google');
       if (msg) setError(msg);
     } finally {
       setGoogleLoading(false);
@@ -145,7 +148,7 @@ export const LoginPage = () => {
       setOtpSent(true);
       setCountdown(60);
     } catch (err) {
-      setError(formatAuthError(err));
+      setError(formatAuthError(err, 'phone'));
     } finally {
       setLoading(false);
     }

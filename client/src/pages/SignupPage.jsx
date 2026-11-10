@@ -42,7 +42,7 @@ export const SignupPage = () => {
     }));
   };
 
-  const formatAuthError = (err) => {
+  const formatAuthError = (err, context = 'general') => {
     const code = err.code || '';
     if (code === 'auth/email-already-in-use') {
       return 'An account with this email address already exists. Please log in instead.';
@@ -54,6 +54,9 @@ export const SignupPage = () => {
       return 'Please enter a valid email address.';
     }
     if (code === 'auth/operation-not-allowed') {
+      if (context === 'google') {
+        return 'Google Sign-In is not enabled yet in your Firebase Console. Please enable Google in Firebase > Authentication > Sign-in method.';
+      }
       return 'This sign-in provider is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.';
     }
     if (code === 'auth/billing-not-enabled') {
@@ -75,7 +78,7 @@ export const SignupPage = () => {
       await loginWithGoogle();
       navigate('/dashboard');
     } catch (err) {
-      const msg = formatAuthError(err);
+      const msg = formatAuthError(err, 'google');
       if (msg) setError(msg);
     } finally {
       setGoogleLoading(false);
