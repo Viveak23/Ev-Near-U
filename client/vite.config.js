@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: process.env.VITE_BASE_URL || (process.env.GITHUB_PAGES ? '/Ev-Near-U/' : './'),
   plugins: [react()],
   server: {
     port: 5173,

@@ -35,7 +35,7 @@ function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
             <Navbar />
             <main className="flex-1">

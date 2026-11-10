@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "vite build --base=/Ev-Near-U/",
     "preview": "vite preview"
   },
   "dependencies": {
