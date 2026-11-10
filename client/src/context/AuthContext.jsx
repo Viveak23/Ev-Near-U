@@ -9,7 +9,7 @@ import {
   RecaptchaVerifier,
   updateProfile as updateFirebaseProfile
 } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, isFirebaseConfigured } from '../config/firebase';
 import { api, setTokenProvider } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
   // Configure api token provider dynamically to retrieve fresh Firebase ID token
   useEffect(() => {
     setTokenProvider(async () => {
-      if (auth.currentUser) {
+      if (auth && auth.currentUser) {
         return await auth.currentUser.getIdToken();
       }
       return null;
@@ -37,53 +37,69 @@ export const AuthProvider = ({ children }) => {
 
   // Listen to Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentFirebaseUser) => {
-      setFirebaseUser(currentFirebaseUser);
-
-      if (currentFirebaseUser) {
-        try {
-          // Get fresh ID token
-          const idToken = await currentFirebaseUser.getIdToken();
-          localStorage.setItem('ev_token', idToken);
-
-          // Retrieve or sync MongoDB user record
-          const res = await api.getMe();
-          if (res.success && res.user) {
-            setUser(res.user);
-          } else {
-            // First time sync if MongoDB record didn't exist yet
-            const syncRes = await api.syncUser({
-              name: currentFirebaseUser.displayName || 'EV User',
-              email: currentFirebaseUser.email,
-              phone: currentFirebaseUser.phoneNumber || ''
-            });
-            if (syncRes.success) setUser(syncRes.user);
-          }
-        } catch (err) {
-          console.error('[AuthContext] Error retrieving MongoDB profile:', err.message);
-          // If server fails or offline, provide user info from Firebase token
-          setUser({
-            firebaseUid: currentFirebaseUser.uid,
-            name: currentFirebaseUser.displayName || 'EV User',
-            email: currentFirebaseUser.email || '',
-            phone: currentFirebaseUser.phoneNumber || '',
-            avatar: currentFirebaseUser.photoURL || '',
-            isEmailVerified: currentFirebaseUser.emailVerified,
-            vehicles: []
-          });
-        }
-      } else {
-        localStorage.removeItem('ev_token');
-        setUser(null);
-      }
+    if (!auth) {
       setLoading(false);
-    });
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentFirebaseUser) => {
+        setFirebaseUser(currentFirebaseUser);
+
+        if (currentFirebaseUser) {
+          try {
+            // Get fresh ID token
+            const idToken = await currentFirebaseUser.getIdToken();
+            localStorage.setItem('ev_token', idToken);
+
+            // Retrieve or sync MongoDB user record
+            const res = await api.getMe();
+            if (res.success && res.user) {
+              setUser(res.user);
+            } else {
+              // First time sync if MongoDB record didn't exist yet
+              const syncRes = await api.syncUser({
+                name: currentFirebaseUser.displayName || 'EV User',
+                email: currentFirebaseUser.email,
+                phone: currentFirebaseUser.phoneNumber || ''
+              });
+              if (syncRes.success) setUser(syncRes.user);
+            }
+          } catch (err) {
+            console.warn('[AuthContext] Error retrieving MongoDB profile:', err.message);
+            setUser({
+              firebaseUid: currentFirebaseUser.uid,
+              name: currentFirebaseUser.displayName || 'EV User',
+              email: currentFirebaseUser.email || '',
+              phone: currentFirebaseUser.phoneNumber || '',
+              avatar: currentFirebaseUser.photoURL || '',
+              isEmailVerified: currentFirebaseUser.emailVerified,
+              vehicles: []
+            });
+          }
+        } else {
+          localStorage.removeItem('ev_token');
+          setUser(null);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.warn('[AuthContext] Auth observer warning:', error.message);
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
 
   // 1. Email & Password Registration
   const registerWithEmail = async ({ name, email, password, phone, vehicles }) => {
+    if (!isFirebaseConfigured || !auth) {
+      throw new Error(
+        'Firebase is not yet configured with production API keys. Please set VITE_FIREBASE_API_KEY in your environment variables.'
+      );
+    }
     const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const fbUser = userCredential.user;
 
@@ -132,6 +148,11 @@ export const AuthProvider = ({ children }) => {
 
   // 2. Email & Password Login
   const loginWithEmail = async (email, password) => {
+    if (!isFirebaseConfigured || !auth) {
+      throw new Error(
+        'Firebase is not yet configured with production API keys. Please set VITE_FIREBASE_API_KEY in your environment variables.'
+      );
+    }
     const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
     const fbUser = userCredential.user;
     const idToken = await fbUser.getIdToken();
@@ -159,6 +180,9 @@ export const AuthProvider = ({ children }) => {
 
   // 3. Setup ReCAPTCHA for Phone Authentication
   const setupRecaptcha = (containerId) => {
+    if (!auth) {
+      throw new Error('Firebase authentication is not initialized');
+    }
     if (!window.recaptchaVerifier) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
         size: 'invisible',
