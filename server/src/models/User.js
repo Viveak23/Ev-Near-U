@@ -3,6 +3,12 @@ import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema(
   {
+    firebaseUid: {
+      type: String,
+      required: [true, 'Firebase UID is required'],
+      unique: true,
+      index: true
+    },
     name: {
       type: String,
       required: [true, 'Please provide your full name'],
@@ -19,14 +25,20 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: [true, 'Please provide a mobile number'],
+      default: '',
       trim: true
     },
-    password: {
+    isEmailVerified: {
+      type: Boolean,
+      default: false
+    },
+    isPhoneVerified: {
+      type: Boolean,
+      default: false
+    },
+    authProvider: {
       type: String,
-      required: [true, 'Please provide a password'],
-      minlength: [6, 'Password must be at least 6 characters'],
-      select: false
+      default: 'firebase'
     },
     avatar: {
       type: String,
@@ -78,9 +90,9 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Encrypt password before saving
+// Encrypt password before saving if present (legacy / optional)
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  if (!this.password || !this.isModified('password')) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);
@@ -90,6 +102,7 @@ userSchema.pre('save', async function (next) {
 
 // Compare password method
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

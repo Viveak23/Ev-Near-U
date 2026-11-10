@@ -17,6 +17,7 @@ import { InvoicePage } from './pages/InvoicePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -101,7 +102,8 @@ function App() {
                 />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="/account" element={<Navigate to="/profile" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
             <Footer />

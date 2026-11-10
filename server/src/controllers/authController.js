@@ -1,163 +1,156 @@
-import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { verifyIdToken } from '../config/firebaseAdmin.js';
 
-const generateToken = (id, rememberMe = false) => {
-  return jwt.sign(
-    { id },
-    process.env.JWT_SECRET || 'super_secret_ev_near_u_jwt_key_2026_secure',
-    {
-      expiresIn: rememberMe ? '30d' : (process.env.JWT_EXPIRES_IN || '7d')
-    }
-  );
+// @desc    Sync authenticated Firebase user into MongoDB
+// @route   POST /api/auth/sync
+// @access  Private (Firebase Bearer token)
+export const syncFirebaseUser = async (req, res, next) => {
+  try {
+    const { name, phone, vehicles, avatar } = req.body;
+    const user = req.user; // populated by protect middleware
+
+    if (name && (!user.name || user.name === 'EV User')) user.name = name;
+    if (phone && !user.phone) user.phone = phone;
+    if (avatar && !user.avatar) user.avatar = avatar;
+    if (vehicles && vehicles.length > 0 && user.vehicles.length === 0) user.vehicles = vehicles;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'User profile synced successfully',
+      user
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
-// @desc    Register a new user
+// @desc    Register a new user after Firebase creation
 // @route   POST /api/auth/register
-// @access  Public
+// @access  Public (Requires valid Firebase ID token in header or body)
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, email, phone, password, confirmPassword, termsAccepted } = req.body;
+    const { idToken, name, email, phone, vehicles } = req.body;
+    const authHeader = req.headers.authorization;
+    const token = idToken || (authHeader && authHeader.startsWith('Bearer') ? authHeader.split(' ')[1] : null);
 
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        message: 'Please fill in all required fields'
+        message: 'Registration requires a valid Firebase authentication ID token.'
       });
     }
 
-    if (password !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Passwords do not match'
-      });
-    }
+    // Verify token with Firebase Admin
+    const decoded = await verifyIdToken(token);
+    const uid = decoded.uid;
+    const verifiedEmail = (decoded.email || email || '').toLowerCase();
+    const verifiedPhone = decoded.phone_number || phone || '';
 
-    if (password.length < 6) {
-      return res.status(400).json({
+    if (!uid) {
+      return res.status(401).json({
         success: false,
-        message: 'Password must be at least 6 characters long'
-      });
-    }
-
-    if (termsAccepted === false) {
-      return res.status(400).json({
-        success: false,
-        message: 'You must accept the terms and conditions'
+        message: 'Invalid Firebase authentication token.'
       });
     }
 
     // Check if user already exists
-    const userExists = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { phone }]
+    let user = await User.findOne({
+      $or: [{ firebaseUid: uid }, ...(verifiedEmail ? [{ email: verifiedEmail }] : [])]
     });
 
-    if (userExists) {
-      return res.status(400).json({
-        success: false,
-        message: userExists.email === email.toLowerCase()
-          ? 'An account with this email address already exists'
-          : 'An account with this mobile number already exists'
+    if (user) {
+      user.firebaseUid = uid;
+      if (name) user.name = name;
+      if (verifiedPhone) user.phone = verifiedPhone;
+      if (vehicles) user.vehicles = vehicles;
+      await user.save();
+    } else {
+      user = await User.create({
+        firebaseUid: uid,
+        name: name || (verifiedEmail ? verifiedEmail.split('@')[0] : 'EV User'),
+        email: verifiedEmail || `${uid}@evnearu.local`,
+        phone: verifiedPhone,
+        avatar: decoded.picture || '',
+        isEmailVerified: Boolean(decoded.email_verified),
+        isPhoneVerified: Boolean(decoded.phone_number),
+        authProvider: 'firebase',
+        vehicles: vehicles || []
       });
     }
-
-    // Create user
-    const user = await User.create({
-      name,
-      email: email.toLowerCase(),
-      phone,
-      password,
-      termsAccepted: true,
-      vehicles: [
-        {
-          make: 'Tata',
-          model: 'Nexon EV',
-          year: 2024,
-          batteryCapacityKWh: 40.5,
-          connectorType: 'CCS2',
-          licensePlate: 'KA 01 EV 1234',
-          isPrimary: true
-        }
-      ]
-    });
-
-    const token = generateToken(user._id);
 
     res.status(201).json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatar: user.avatar,
-        vehicles: user.vehicles,
-        savedLocations: user.savedLocations,
-        isHostVerified: user.isHostVerified
-      }
+      message: 'Account registered and persisted successfully',
+      user
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Authenticate user & get token
+// @desc    Login / Verify Firebase session
 // @route   POST /api/auth/login
-// @access  Public
+// @access  Public (Requires Firebase ID token)
 export const loginUser = async (req, res, next) => {
   try {
-    const { identifier, password, rememberMe } = req.body;
+    const { idToken } = req.body;
+    const authHeader = req.headers.authorization;
+    const token = idToken || (authHeader && authHeader.startsWith('Bearer') ? authHeader.split(' ')[1] : null);
 
-    if (!identifier || !password) {
+    if (!token) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email or phone number and password'
+        message: 'Authentication requires a valid Firebase ID token.'
       });
     }
 
-    // Find user by email or phone
-    const cleanId = identifier.trim().toLowerCase();
-    const user = await User.findOne({
-      $or: [{ email: cleanId }, { phone: identifier.trim() }]
-    }).select('+password');
+    const decoded = await verifyIdToken(token);
+    const uid = decoded.uid;
 
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials. Please verify your email/phone and password.'
-      });
+    let user = await User.findOne({ firebaseUid: uid });
+    if (!user && decoded.email) {
+      user = await User.findOne({ email: decoded.email.toLowerCase() });
+      if (user) {
+        user.firebaseUid = uid;
+        await user.save();
+      }
     }
 
-    const token = generateToken(user._id, rememberMe);
+    if (!user) {
+      // Create user record on initial login
+      user = await User.create({
+        firebaseUid: uid,
+        name: decoded.name || (decoded.email ? decoded.email.split('@')[0] : 'EV User'),
+        email: decoded.email ? decoded.email.toLowerCase() : `${uid}@evnearu.local`,
+        phone: decoded.phone_number || '',
+        avatar: decoded.picture || '',
+        isEmailVerified: Boolean(decoded.email_verified),
+        isPhoneVerified: Boolean(decoded.phone_number),
+        authProvider: 'firebase',
+        vehicles: []
+      });
+    }
 
     res.json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatar: user.avatar,
-        vehicles: user.vehicles,
-        savedLocations: user.savedLocations,
-        isHostVerified: user.isHostVerified
-      }
+      message: 'Logged in successfully',
+      user
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Get current logged in user
+// @desc    Get current authenticated user profile
 // @route   GET /api/auth/me
-// @access  Private
+// @access  Private (Firebase Bearer token)
 export const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
     res.json({
       success: true,
-      user
+      user: req.user
     });
   } catch (error) {
     next(error);
@@ -166,12 +159,12 @@ export const getMe = async (req, res, next) => {
 
 // @desc    Update user profile & vehicles
 // @route   PUT /api/auth/profile
-// @access  Private
+// @access  Private (Firebase Bearer token)
 export const updateProfile = async (req, res, next) => {
   try {
     const { name, phone, avatar, vehicles, savedLocations, payoutBankDetails } = req.body;
+    const user = req.user;
 
-    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }

@@ -28,7 +28,7 @@ export const BookingModal = ({ charger, isOpen, onClose }) => {
   const [durationHours, setDurationHours] = useState(2);
   const [estimatedKWh, setEstimatedKWh] = useState(25);
   const [selectedVehicle, setSelectedVehicle] = useState(
-    user?.vehicles?.[0] || { make: 'EV', model: 'Electric Vehicle', licensePlate: 'KA 01 EV 1234' }
+    user?.vehicles?.[0] || { make: '', model: '', licensePlate: '' }
   );
   const [notes, setNotes] = useState('');
 

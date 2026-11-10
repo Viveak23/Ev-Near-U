@@ -1,13 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendEmailVerification,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  updateProfile as updateFirebaseProfile
+} from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { api, setTokenProvider } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const [firebaseUser, setFirebaseUser] = useState(null);
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('ev_token') || null);
   const [loading, setLoading] = useState(true);
-  // Seamless dual-role toggle: 'seeker' (EV Driver) vs 'host' (Charger Owner)
   const [roleView, setRoleView] = useState(localStorage.getItem('ev_role_view') || 'seeker');
 
   const switchRoleView = (view) => {
@@ -15,58 +25,207 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('ev_role_view', view);
   };
 
+  // Configure api token provider dynamically to retrieve fresh Firebase ID token
   useEffect(() => {
-    const loadUser = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
+    setTokenProvider(async () => {
+      if (auth.currentUser) {
+        return await auth.currentUser.getIdToken();
       }
-      try {
-        const data = await api.getMe();
-        if (data.success && data.user) {
-          setUser(data.user);
-        } else {
-          logout();
+      return null;
+    });
+  }, []);
+
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentFirebaseUser) => {
+      setFirebaseUser(currentFirebaseUser);
+
+      if (currentFirebaseUser) {
+        try {
+          // Get fresh ID token
+          const idToken = await currentFirebaseUser.getIdToken();
+          localStorage.setItem('ev_token', idToken);
+
+          // Retrieve or sync MongoDB user record
+          const res = await api.getMe();
+          if (res.success && res.user) {
+            setUser(res.user);
+          } else {
+            // First time sync if MongoDB record didn't exist yet
+            const syncRes = await api.syncUser({
+              name: currentFirebaseUser.displayName || 'EV User',
+              email: currentFirebaseUser.email,
+              phone: currentFirebaseUser.phoneNumber || ''
+            });
+            if (syncRes.success) setUser(syncRes.user);
+          }
+        } catch (err) {
+          console.error('[AuthContext] Error retrieving MongoDB profile:', err.message);
+          // If server fails or offline, provide user info from Firebase token
+          setUser({
+            firebaseUid: currentFirebaseUser.uid,
+            name: currentFirebaseUser.displayName || 'EV User',
+            email: currentFirebaseUser.email || '',
+            phone: currentFirebaseUser.phoneNumber || '',
+            avatar: currentFirebaseUser.photoURL || '',
+            isEmailVerified: currentFirebaseUser.emailVerified,
+            vehicles: []
+          });
         }
-      } catch (err) {
-        console.error('Error loading current user:', err);
-        logout();
-      } finally {
-        setLoading(false);
+      } else {
+        localStorage.removeItem('ev_token');
+        setUser(null);
       }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 1. Email & Password Registration
+  const registerWithEmail = async ({ name, email, password, phone, vehicles }) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    const fbUser = userCredential.user;
+
+    // Update Firebase display name
+    if (name) {
+      await updateFirebaseProfile(fbUser, { displayName: name });
+    }
+
+    // Send verification email
+    try {
+      await sendEmailVerification(fbUser);
+    } catch (e) {
+      console.warn('Failed to send verification email automatically:', e.message);
+    }
+
+    // Sync with MongoDB backend
+    const idToken = await fbUser.getIdToken();
+    localStorage.setItem('ev_token', idToken);
+
+    try {
+      const syncRes = await api.register({
+        idToken,
+        name,
+        email: fbUser.email,
+        phone: phone || '',
+        vehicles: vehicles || []
+      });
+      if (syncRes.success && syncRes.user) {
+        setUser(syncRes.user);
+        return syncRes.user;
+      }
+    } catch (err) {
+      console.error('[AuthContext] Registration sync error:', err.message);
+    }
+
+    const fallbackUser = {
+      firebaseUid: fbUser.uid,
+      name: name || 'EV User',
+      email: fbUser.email,
+      phone: phone || '',
+      vehicles: vehicles || []
     };
+    setUser(fallbackUser);
+    return fallbackUser;
+  };
 
-    loadUser();
-  }, [token]);
+  // 2. Email & Password Login
+  const loginWithEmail = async (email, password) => {
+    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+    const fbUser = userCredential.user;
+    const idToken = await fbUser.getIdToken();
+    localStorage.setItem('ev_token', idToken);
 
-  const login = async (identifier, password, rememberMe = false) => {
-    const res = await api.login({ identifier, password, rememberMe });
-    if (res.success && res.token) {
-      localStorage.setItem('ev_token', res.token);
-      setToken(res.token);
-      setUser(res.user);
-      return res.user;
+    try {
+      const res = await api.login({ idToken });
+      if (res.success && res.user) {
+        setUser(res.user);
+        return res.user;
+      }
+    } catch (err) {
+      console.error('[AuthContext] Backend login error:', err.message);
     }
-    throw new Error(res.message || 'Login failed');
+
+    const basicUser = {
+      firebaseUid: fbUser.uid,
+      name: fbUser.displayName || fbUser.email?.split('@')[0] || 'EV User',
+      email: fbUser.email,
+      phone: fbUser.phoneNumber || ''
+    };
+    setUser(basicUser);
+    return basicUser;
   };
 
-  const register = async (userData) => {
-    const res = await api.register(userData);
-    if (res.success && res.token) {
-      localStorage.setItem('ev_token', res.token);
-      setToken(res.token);
-      setUser(res.user);
-      return res.user;
+  // 3. Setup ReCAPTCHA for Phone Authentication
+  const setupRecaptcha = (containerId) => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'invisible',
+        callback: () => {
+          // reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = null;
+          }
+        }
+      });
     }
-    throw new Error(res.message || 'Registration failed');
+    return window.recaptchaVerifier;
   };
 
-  const logout = () => {
-    localStorage.removeItem('ev_token');
-    setToken(null);
-    setUser(null);
+  // 4. Send Phone OTP
+  const sendPhoneOtp = async (phoneNumber, containerId = 'recaptcha-container') => {
+    const verifier = setupRecaptcha(containerId);
+    return await signInWithPhoneNumber(auth, phoneNumber, verifier);
   };
 
+  // 5. Verify Phone OTP
+  const verifyPhoneOtp = async (confirmationResult, otpCode, additionalData = {}) => {
+    const userCredential = await confirmationResult.confirm(otpCode);
+    const fbUser = userCredential.user;
+
+    const idToken = await fbUser.getIdToken();
+    localStorage.setItem('ev_token', idToken);
+
+    try {
+      const syncRes = await api.syncUser({
+        name: additionalData.name || fbUser.displayName || 'EV Driver',
+        phone: fbUser.phoneNumber,
+        vehicles: additionalData.vehicles || []
+      });
+      if (syncRes.success && syncRes.user) {
+        setUser(syncRes.user);
+        return syncRes.user;
+      }
+    } catch (err) {
+      console.error('[AuthContext] Phone sync error:', err.message);
+    }
+
+    const basicUser = {
+      firebaseUid: fbUser.uid,
+      name: additionalData.name || 'EV Driver',
+      phone: fbUser.phoneNumber,
+      email: fbUser.email || ''
+    };
+    setUser(basicUser);
+    return basicUser;
+  };
+
+  // 6. Sign Out
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } finally {
+      localStorage.removeItem('ev_token');
+      setFirebaseUser(null);
+      setUser(null);
+    }
+  };
+
+  // 7. Update Profile
   const updateProfile = async (data) => {
     const res = await api.updateProfile(data);
     if (res.success && res.user) {
@@ -79,14 +238,16 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider
       value={{
+        firebaseUser,
         user,
-        token,
         loading,
-        isAuthenticated: !!user,
+        isAuthenticated: !!firebaseUser || !!user,
         roleView,
         switchRoleView,
-        login,
-        register,
+        registerWithEmail,
+        loginWithEmail,
+        sendPhoneOtp,
+        verifyPhoneOtp,
         logout,
         updateProfile
       }}

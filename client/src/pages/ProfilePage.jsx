@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   User,
@@ -11,78 +11,80 @@ import {
   CheckCircle2,
   AlertCircle,
   Save,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 
 export const ProfilePage = () => {
   const { user, updateProfile } = useAuth();
 
-  const [name, setName] = useState(user?.name || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [avatar, setAvatar] = useState(user?.avatar || '');
-
-  // Vehicle garage
-  const [vehicles, setVehicles] = useState(
-    user?.vehicles && user.vehicles.length > 0
-      ? user.vehicles
-      : [
-          {
-            make: 'Tata',
-            model: 'Nexon EV Empowered',
-            year: 2024,
-            batteryCapacityKWh: 40.5,
-            connectorType: 'CCS2',
-            licensePlate: 'KA 01 EV 1234',
-            isPrimary: true
-          }
-        ]
-  );
-
-  // Bank & payout details
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [vehicles, setVehicles] = useState([]);
   const [bankDetails, setBankDetails] = useState({
-    accountHolder: user?.payoutBankDetails?.accountHolder || user?.name || '',
-    bankName: user?.payoutBankDetails?.bankName || 'HDFC Bank',
-    accountNumberMasked: user?.payoutBankDetails?.accountNumberMasked || '•••• •••• 8821',
-    ifscCode: user?.payoutBankDetails?.ifscCode || 'HDFC0001234',
-    upiId: user?.payoutBankDetails?.upiId || 'evdriver@okaxis'
+    accountHolder: '',
+    bankName: '',
+    accountNumberMasked: '',
+    ifscCode: '',
+    upiId: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
+  // Sync state with authenticated user
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setPhone(user.phone || '');
+      setAvatar(user.avatar || '');
+      setVehicles(Array.isArray(user.vehicles) ? user.vehicles : []);
+      if (user.payoutBankDetails) {
+        setBankDetails({
+          accountHolder: user.payoutBankDetails.accountHolder || '',
+          bankName: user.payoutBankDetails.bankName || '',
+          accountNumberMasked: user.payoutBankDetails.accountNumberMasked || '',
+          ifscCode: user.payoutBankDetails.ifscCode || '',
+          upiId: user.payoutBankDetails.upiId || ''
+        });
+      }
+    }
+  }, [user]);
+
   // Add new vehicle to garage
   const handleAddVehicle = () => {
     setVehicles([
       ...vehicles,
       {
-        make: 'MG',
-        model: 'ZS EV',
+        make: '',
+        model: '',
         year: 2024,
-        batteryCapacityKWh: 50.3,
+        batteryCapacityKWh: 40,
         connectorType: 'CCS2',
-        licensePlate: 'KA 03 EV 8899',
-        isPrimary: false
+        licensePlate: '',
+        isPrimary: vehicles.length === 0
       }
     ]);
+  };
+
+  const handleUpdateVehicle = (index, field, value) => {
+    const updated = [...vehicles];
+    updated[index][field] = value;
+    setVehicles(updated);
   };
 
   const handleRemoveVehicle = (index) => {
     setVehicles(vehicles.filter((_, i) => i !== index));
   };
 
-  const handleVehicleChange = (index, field, value) => {
-    const updated = [...vehicles];
-    updated[index][field] = value;
-    setVehicles(updated);
-  };
-
-  const handleSave = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      setError('');
       setMsg('');
+      setError('');
 
       await updateProfile({
         name,
@@ -92,7 +94,7 @@ export const ProfilePage = () => {
         payoutBankDetails: bankDetails
       });
 
-      setMsg('Profile and vehicle garage updated successfully!');
+      setMsg('Your profile has been saved successfully.');
     } catch (err) {
       setError(err.message || 'Failed to update profile');
     } finally {
@@ -104,16 +106,18 @@ export const ProfilePage = () => {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
       {/* Header */}
-      <div>
-        <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
-          Account Settings
-        </span>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-          Profile & Vehicle Garage
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Manage your contact credentials, EV garage specs, and payout bank information.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+            Account & Vehicles
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
+            User Profile & Garage
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Manage your personal contact details, EV specifications, and host payout settings.
+          </p>
+        </div>
       </div>
 
       {msg && (
@@ -130,14 +134,14 @@ export const ProfilePage = () => {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-8">
         
-        {/* Section 1: Personal Info */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-          <h2 className="text-base font-extrabold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+        {/* 1. BASIC INFORMATION */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
             <User className="w-5 h-5 text-emerald-600" />
-            <span>Personal Information</span>
-          </h2>
+            <h2 className="text-base font-bold text-slate-900">Personal Information</h2>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -148,8 +152,21 @@ export const ProfilePage = () => {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                placeholder="Your full name"
                 required
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Email Address (Authenticated)
+              </label>
+              <input
+                type="email"
+                value={user?.email || ''}
+                disabled
+                className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-500 cursor-not-allowed"
               />
             </div>
 
@@ -158,143 +175,186 @@ export const ProfilePage = () => {
                 Mobile Number
               </label>
               <input
-                type="text"
+                type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                placeholder="+91 9876543210"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Profile Avatar URL (optional)
+              </label>
+              <input
+                type="url"
+                value={avatar}
+                onChange={(e) => setAvatar(e.target.value)}
+                placeholder="https://example.com/avatar.jpg"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
               />
             </div>
           </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Email Address (Login ID)
-            </label>
-            <input
-              type="email"
-              disabled
-              value={user?.email || ''}
-              className="w-full px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-500 cursor-not-allowed"
-            />
-          </div>
         </div>
 
-        {/* Section 2: Vehicle Garage */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+        {/* 2. VEHICLE GARAGE */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2">
               <Car className="w-5 h-5 text-emerald-600" />
-              <span>EV Vehicle Garage ({vehicles.length})</span>
-            </h2>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Vehicle Garage</h2>
+                <p className="text-xs text-slate-500">
+                  Register your EVs to speed up slot bookings and connector matching.
+                </p>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={handleAddVehicle}
-              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-1 border border-emerald-200"
+              className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-bold transition flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Vehicle</span>
             </button>
           </div>
 
-          <div className="space-y-4">
-            {vehicles.map((v, i) => (
-              <div
-                key={i}
-                className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative space-y-3 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-700">
-                    Vehicle #{i + 1} {v.isPrimary ? '• Primary Car' : ''}
-                  </span>
-                  {vehicles.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveVehicle(i)}
-                      className="text-slate-400 hover:text-rose-600 transition"
-                      title="Remove vehicle"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+          {vehicles.length === 0 ? (
+            <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6 space-y-2">
+              <Car className="w-8 h-8 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-700">No vehicles added yet</p>
+              <p className="text-[11px] text-slate-400">
+                Click "+ Add Vehicle" to link your EV make, battery capacity, and connector type.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {vehicles.map((v, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 bg-slate-50 border border-slate-200 rounded-2xl relative space-y-3"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveVehicle(idx)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-rose-600"
+                    title="Remove vehicle"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Make (e.g. Tata, MG, Tesla)
+                      </label>
+                      <input
+                        type="text"
+                        value={v.make}
+                        onChange={(e) => handleUpdateVehicle(idx, 'make', e.target.value)}
+                        placeholder="e.g. Tata"
+                        required
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Model
+                      </label>
+                      <input
+                        type="text"
+                        value={v.model}
+                        onChange={(e) => handleUpdateVehicle(idx, 'model', e.target.value)}
+                        placeholder="e.g. Nexon EV"
+                        required
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Battery Capacity (kWh)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={v.batteryCapacityKWh}
+                        onChange={(e) =>
+                          handleUpdateVehicle(idx, 'batteryCapacityKWh', parseFloat(e.target.value))
+                        }
+                        placeholder="40.5"
+                        required
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Connector Type
+                      </label>
+                      <select
+                        value={v.connectorType}
+                        onChange={(e) => handleUpdateVehicle(idx, 'connectorType', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                      >
+                        <option value="CCS2">CCS2 (Standard DC/AC)</option>
+                        <option value="Type 2">Type 2 AC</option>
+                        <option value="Tesla NACS">Tesla NACS</option>
+                        <option value="CHAdeMO">CHAdeMO</option>
+                        <option value="16A 3-Pin">16A 3-Pin Socket</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        License Plate (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={v.licensePlate || ''}
+                        onChange={(e) => handleUpdateVehicle(idx, 'licensePlate', e.target.value)}
+                        placeholder="KA 01 EV 1234"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium"
+                      />
+                    </div>
+                  </div>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Brand</label>
-                    <input
-                      type="text"
-                      value={v.make}
-                      onChange={(e) => handleVehicleChange(i, 'make', e.target.value)}
-                      placeholder="e.g. Tata"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Model</label>
-                    <input
-                      type="text"
-                      value={v.model}
-                      onChange={(e) => handleVehicleChange(i, 'model', e.target.value)}
-                      placeholder="e.g. Nexon EV"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Battery (kWh)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={v.batteryCapacityKWh}
-                      onChange={(e) => handleVehicleChange(i, 'batteryCapacityKWh', parseFloat(e.target.value) || 0)}
-                      placeholder="e.g. 40.5"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Connector</label>
-                    <select
-                      value={v.connectorType}
-                      onChange={(e) => handleVehicleChange(i, 'connectorType', e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-semibold"
-                    >
-                      <option value="CCS2">CCS2</option>
-                      <option value="Type 2">Type 2</option>
-                      <option value="CHAdeMO">CHAdeMO</option>
-                      <option value="Tesla NACS">Tesla NACS</option>
-                      <option value="16A 3-Pin">16A 3-Pin</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">License Plate</label>
-                    <input
-                      type="text"
-                      value={v.licensePlate || ''}
-                      onChange={(e) => handleVehicleChange(i, 'licensePlate', e.target.value)}
-                      placeholder="e.g. KA 01 EV 1234"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Section 3: Host Payout Bank Details */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-          <h2 className="text-base font-extrabold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+        {/* 3. HOST PAYOUT DETAILS */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
             <Building2 className="w-5 h-5 text-emerald-600" />
-            <span>Host Payout Bank Details</span>
-          </h2>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Host Payout Information</h2>
+              <p className="text-xs text-slate-500">
+                Required for withdrawing earnings from your shared EV chargers.
+              </p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Bank Account Holder Name
+              </label>
+              <input
+                type="text"
+                value={bankDetails.accountHolder}
+                onChange={(e) =>
+                  setBankDetails({ ...bankDetails, accountHolder: e.target.value })
+                }
+                placeholder="Account Holder Name"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Bank Name
@@ -303,7 +363,8 @@ export const ProfilePage = () => {
                 type="text"
                 value={bankDetails.bankName}
                 onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                placeholder="e.g. HDFC Bank, ICICI Bank, SBI"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
               />
             </div>
 
@@ -314,8 +375,11 @@ export const ProfilePage = () => {
               <input
                 type="text"
                 value={bankDetails.accountNumberMasked}
-                onChange={(e) => setBankDetails({ ...bankDetails, accountNumberMasked: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-semibold"
+                onChange={(e) =>
+                  setBankDetails({ ...bankDetails, accountNumberMasked: e.target.value })
+                }
+                placeholder="Enter bank account number"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
               />
             </div>
 
@@ -327,33 +391,44 @@ export const ProfilePage = () => {
                 type="text"
                 value={bankDetails.ifscCode}
                 onChange={(e) => setBankDetails({ ...bankDetails, ifscCode: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-semibold uppercase"
+                placeholder="e.g. HDFC0001234"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium uppercase"
               />
             </div>
 
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                UPI ID (VPA)
+                UPI ID (for instant payouts)
               </label>
               <input
                 type="text"
                 value={bankDetails.upiId}
                 onChange={(e) => setBankDetails({ ...bankDetails, upiId: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono font-semibold"
+                placeholder="yourname@upi"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
               />
             </div>
           </div>
         </div>
 
-        {/* Submit */}
-        <div className="flex justify-end pt-2">
+        {/* Save Button */}
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="py-3 px-8 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-2 disabled:opacity-50"
           >
-            <Save className="w-4 h-4" />
-            <span>{loading ? 'Saving Changes...' : 'Save Profile & Settings'}</span>
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Saving Profile...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Save Profile Changes</span>
+              </>
+            )}
           </button>
         </div>
 

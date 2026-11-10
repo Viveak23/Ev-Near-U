@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Zap, Eye, EyeOff, Lock, Mail, User, Phone, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import {
+  Zap,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  User,
+  Phone,
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  RefreshCw
+} from 'lucide-react';
 
 export const SignupPage = () => {
-  const { register } = useAuth();
+  const { registerWithEmail } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -19,6 +31,7 @@ export const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successInfo, setSuccessInfo] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -28,8 +41,32 @@ export const SignupPage = () => {
     }));
   };
 
+  const formatAuthError = (err) => {
+    const code = err.code || '';
+    if (code === 'auth/email-already-in-use') {
+      return 'An account with this email address already exists. Please log in instead.';
+    }
+    if (code === 'auth/weak-password') {
+      return 'Password is too weak. Please choose at least 6 characters with letters and numbers.';
+    }
+    if (code === 'auth/invalid-email') {
+      return 'Please enter a valid email address.';
+    }
+    return err.message || 'Registration failed. Please check your information.';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.name.trim()) {
+      setError('Please provide your full name');
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setError('Please provide a valid email address');
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -49,10 +86,19 @@ export const SignupPage = () => {
     try {
       setLoading(true);
       setError('');
-      await register(formData);
-      navigate('/dashboard');
+      await registerWithEmail({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        phone: formData.phone.trim()
+      });
+
+      setSuccessInfo('Account created! A verification link has been sent to your email.');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
     } catch (err) {
-      setError(err.message || 'Registration failed. Please check your details.');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -68,10 +114,10 @@ export const SignupPage = () => {
             <Zap className="w-6 h-6 fill-white" />
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Create Your EvNearU Account
+            Create Your Account
           </h2>
           <p className="text-xs text-slate-500">
-            One single account to both host chargers and find nearby stations
+            One universal account to host chargers and book nearby stations
           </p>
         </div>
 
@@ -79,6 +125,13 @@ export const SignupPage = () => {
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {successInfo && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successInfo}</span>
           </div>
         )}
 
@@ -96,14 +149,14 @@ export const SignupPage = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="e.g. Ramesh Kumar"
+                placeholder="Ramesh Kumar"
                 required
-                className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
               />
             </div>
           </div>
 
-          {/* Email */}
+          {/* Email Address */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Email Address
@@ -117,15 +170,15 @@ export const SignupPage = () => {
                 onChange={handleChange}
                 placeholder="ramesh@example.com"
                 required
-                className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
               />
             </div>
           </div>
 
-          {/* Mobile Phone */}
+          {/* Mobile Number */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Mobile Number
+              Mobile Number (optional)
             </label>
             <div className="relative">
               <Phone className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
@@ -134,83 +187,82 @@ export const SignupPage = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+91 98765 43210"
-                required
-                className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium"
+                placeholder="+91 9876543210"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
               />
             </div>
           </div>
 
-          {/* Password & Confirm Password */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Min 6 chars"
-                  required
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repeat password"
-                  required
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium"
-                />
-              </div>
+          {/* Password */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Password (minimum 6 characters)
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Create a strong password"
+                required
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-500">
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="text-emerald-700 hover:underline font-semibold"
-            >
-              {showPassword ? 'Hide password' : 'Show password'}
-            </button>
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Re-enter your password"
+                required
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+            </div>
           </div>
 
-          {/* Terms Checkbox */}
-          <div className="flex items-start pt-1">
+          {/* Terms checkbox */}
+          <div className="flex items-center gap-2 pt-1">
             <input
-              id="terms"
               type="checkbox"
+              id="terms"
               name="termsAccepted"
               checked={formData.termsAccepted}
               onChange={handleChange}
-              className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 mt-0.5"
+              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
             />
-            <label htmlFor="terms" className="ml-2 text-[11px] text-slate-600 leading-tight">
-              I accept the <a href="#terms" className="text-emerald-600 underline">Terms of Service</a> and acknowledge the <a href="#privacy" className="text-emerald-600 underline">Privacy Policy</a>.
+            <label htmlFor="terms" className="text-xs text-slate-600">
+              I agree to the Terms of Service & Privacy Policy
             </label>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
-              <span>Creating Your Account...</span>
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Creating Account...</span>
+              </>
             ) : (
               <>
                 <span>Complete Registration</span>
@@ -221,12 +273,14 @@ export const SignupPage = () => {
         </form>
 
         {/* Footer */}
-        <p className="text-center text-xs text-slate-500">
-          Already registered on EvNearU?{' '}
-          <Link to="/login" className="font-bold text-emerald-600 hover:underline">
-            Sign In Here
-          </Link>
-        </p>
+        <div className="text-center pt-2 border-t border-slate-100">
+          <p className="text-xs text-slate-500">
+            Already have an account?{' '}
+            <Link to="/login" className="font-bold text-emerald-600 hover:underline">
+              Sign In
+            </Link>
+          </p>
+        </div>
 
       </div>
     </div>

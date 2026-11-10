@@ -10,9 +10,8 @@ import { fileURLToPath } from 'url';
 
 import { connectDB } from './config/db.js';
 import { initTelemetrySocket } from './sockets/telemetrySocket.js';
+// Seed utility (optional manual maintenance)
 import { notFound, errorHandler } from './middleware/errorHandler.js';
-
-// Route imports
 import authRoutes from './routes/authRoutes.js';
 import chargerRoutes from './routes/chargerRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
@@ -21,9 +20,6 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
 
-// Seed utility
-import Charger from './models/Charger.js';
-import { seedDatabase } from './utils/seed.js';
 
 dotenv.config();
 
@@ -95,13 +91,6 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
-
-    // Auto-seed if database is empty
-    const chargerCount = await Charger.countDocuments();
-    if (chargerCount === 0) {
-      console.log('[Server] Database is empty. Running initial seed...');
-      await seedDatabase();
-    }
 
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`[Server] EvNearU backend server running on port ${PORT}`);
