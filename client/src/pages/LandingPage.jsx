@@ -5,6 +5,7 @@ import {
   Search,
   ShieldCheck,
   TrendingUp,
+  TrendingDown,
   MapPin,
   Clock,
   Sparkles,
@@ -15,7 +16,13 @@ import {
   CheckCircle2,
   DollarSign,
   HeartHandshake,
-  HelpCircle
+  HelpCircle,
+  Compass,
+  CreditCard,
+  Wallet,
+  Building2,
+  Gauge,
+  Headset
 } from 'lucide-react';
 
 export const LandingPage = () => {
@@ -122,19 +129,23 @@ export const LandingPage = () => {
 
             {/* Trust Highlights */}
             <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center border-t border-slate-200">
-              <div>
+              <div className="p-3 rounded-2xl hover:bg-slate-50 transition">
+                <Building2 className="w-5 h-5 mx-auto text-emerald-600 mb-1.5" />
                 <p className="text-2xl sm:text-3xl font-black text-slate-900">5,000+</p>
                 <p className="text-xs text-slate-500 font-medium">Private Bays Available</p>
               </div>
-              <div>
+              <div className="p-3 rounded-2xl hover:bg-slate-50 transition">
+                <TrendingDown className="w-5 h-5 mx-auto text-emerald-600 mb-1.5" />
                 <p className="text-2xl sm:text-3xl font-black text-slate-900">40% Cheaper</p>
                 <p className="text-xs text-slate-500 font-medium">Than Commercial DC</p>
               </div>
-              <div>
+              <div className="p-3 rounded-2xl hover:bg-slate-50 transition">
+                <Wallet className="w-5 h-5 mx-auto text-emerald-600 mb-1.5" />
                 <p className="text-2xl sm:text-3xl font-black text-slate-900">₹15,000+</p>
                 <p className="text-xs text-slate-500 font-medium">Avg Monthly Host Income</p>
               </div>
-              <div>
+              <div className="p-3 rounded-2xl hover:bg-slate-50 transition">
+                <ShieldCheck className="w-5 h-5 mx-auto text-emerald-600 mb-1.5" />
                 <p className="text-2xl sm:text-3xl font-black text-slate-900">99.8%</p>
                 <p className="text-xs text-slate-500 font-medium">Booking Reliability</p>
               </div>
@@ -160,9 +171,14 @@ export const LandingPage = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs relative">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-lg mb-6">
-              1
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs relative hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-xs">
+                <Compass className="w-6 h-6" />
+              </div>
+              <span className="text-xs font-black tracking-widest text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                STEP 01
+              </span>
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">
               Discover & Reserve
@@ -172,9 +188,14 @@ export const LandingPage = () => {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs relative">
-            <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center font-black text-lg mb-6">
-              2
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs relative hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-600 flex items-center justify-center shadow-xs">
+                <Zap className="w-6 h-6 fill-teal-600/20" />
+              </div>
+              <span className="text-xs font-black tracking-widest text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">
+                STEP 02
+              </span>
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">
               Charge with Live Telemetry
@@ -184,9 +205,14 @@ export const LandingPage = () => {
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs relative">
-            <div className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center font-black text-lg mb-6">
-              3
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xs relative hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center shadow-xs">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <span className="text-xs font-black tracking-widest text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full border border-sky-200">
+                STEP 03
+              </span>
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">
               Automated Bill & Host Payout
@@ -308,8 +334,8 @@ export const LandingPage = () => {
           </div>
 
           <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 text-teal-600 flex items-center justify-center">
+              <Gauge className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900">
               Precise Metered Billing
@@ -320,8 +346,8 @@ export const LandingPage = () => {
           </div>
 
           <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <HeartHandshake className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center">
+              <Headset className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900">
               24/7 Roadside Assistance

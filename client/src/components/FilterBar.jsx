@@ -90,9 +90,9 @@ export const FilterBar = ({
             className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-600 font-medium"
           >
             <option value="">Any Star Rating</option>
-            <option value="4.0">⭐ 4.0 & above</option>
-            <option value="4.5">⭐ 4.5 & above</option>
-            <option value="4.8">⭐ 4.8 Top Rated</option>
+            <option value="4.0">★ 4.0 & above</option>
+            <option value="4.5">★ 4.5 & above</option>
+            <option value="4.8">★ 4.8 Top Rated</option>
           </select>
         </div>
       </div>

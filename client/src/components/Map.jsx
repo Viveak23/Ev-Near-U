@@ -92,8 +92,9 @@ export const Map = ({
               icon={createUserIcon()}
             >
               <Popup>
-                <div className="text-xs font-semibold text-slate-800 p-1">
-                  📍 Your Location
+                <div className="text-xs font-semibold text-slate-800 p-1 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Your Current Location</span>
                 </div>
               </Popup>
             </Marker>
