@@ -7,7 +7,9 @@ import {
   sendEmailVerification,
   signInWithPhoneNumber,
   RecaptchaVerifier,
-  updateProfile as updateFirebaseProfile
+  updateProfile as updateFirebaseProfile,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '../config/firebase';
 import { api, setTokenProvider } from '../services/api';
@@ -238,7 +240,48 @@ export const AuthProvider = ({ children }) => {
     return basicUser;
   };
 
-  // 6. Sign Out
+  // 6. Google Sign-In
+  const loginWithGoogle = async () => {
+    if (!isFirebaseConfigured || !auth) {
+      throw new Error(
+        'Firebase is not yet configured with production API keys. Please check your Firebase configuration.'
+      );
+    }
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const userCredential = await signInWithPopup(auth, provider);
+    const fbUser = userCredential.user;
+    const idToken = await fbUser.getIdToken();
+    localStorage.setItem('ev_token', idToken);
+
+    try {
+      const syncRes = await api.syncUser({
+        name: fbUser.displayName || 'EV User',
+        email: fbUser.email || '',
+        phone: fbUser.phoneNumber || '',
+        avatar: fbUser.photoURL || ''
+      });
+      if (syncRes.success && syncRes.user) {
+        setUser(syncRes.user);
+        return syncRes.user;
+      }
+    } catch (err) {
+      console.warn('[AuthContext] Google sync backend warning:', err.message);
+    }
+
+    const basicUser = {
+      firebaseUid: fbUser.uid,
+      name: fbUser.displayName || 'EV User',
+      email: fbUser.email || '',
+      phone: fbUser.phoneNumber || '',
+      avatar: fbUser.photoURL || '',
+      isEmailVerified: fbUser.emailVerified
+    };
+    setUser(basicUser);
+    return basicUser;
+  };
+
+  // 7. Sign Out
   const logout = async () => {
     try {
       await signOut(auth);
@@ -270,6 +313,7 @@ export const AuthProvider = ({ children }) => {
         switchRoleView,
         registerWithEmail,
         loginWithEmail,
+        loginWithGoogle,
         sendPhoneOtp,
         verifyPhoneOtp,
         logout,
