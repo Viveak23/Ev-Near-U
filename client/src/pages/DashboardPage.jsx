@@ -338,15 +338,21 @@ export const DashboardPage = () => {
       {activeTab === 'bookings' && (
         <div className="space-y-4">
           {myBookings.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-              <Calendar className="w-12 h-12 text-slate-300 mx-auto" />
-              <h3 className="font-bold text-base text-slate-800">No active bookings yet</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Discover nearby chargers on the interactive map and reserve your slot.
-              </p>
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4">
+              <div className="w-20 h-20 rounded-3xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto shadow-inner">
+                <span className="text-3xl select-none" role="img" aria-label="EV Car">
+                  🚗⚡
+                </span>
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-lg text-slate-800">No Active Bookings Yet</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Find verified chargers nearby on the interactive map and reserve your slot with guaranteed price transparency.
+                </p>
+              </div>
               <Link
                 to="/find-chargers"
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition"
               >
                 <Search className="w-4 h-4" />
                 <span>Search Nearby Chargers</span>
@@ -458,15 +464,21 @@ export const DashboardPage = () => {
           </div>
 
           {myChargers.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-              <Zap className="w-12 h-12 text-slate-300 mx-auto" />
-              <h3 className="font-bold text-base text-slate-800">You haven't listed a charger yet</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Share your home or commercial EV charger and earn money while supporting green mobility.
-              </p>
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4">
+              <div className="w-20 h-20 rounded-3xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto shadow-inner">
+                <span className="text-3xl select-none" role="img" aria-label="EV Charger">
+                  ⚡🔌
+                </span>
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-lg text-slate-800">No Charger Listings Added Yet</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Share your home or commercial EV charger and earn money while supporting green mobility.
+                </p>
+              </div>
               <Link
                 to="/post-charger"
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Publish Your Charger</span>

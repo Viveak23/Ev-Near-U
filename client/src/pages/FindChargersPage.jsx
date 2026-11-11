@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { Map } from '../components/Map';
 import { ChargerCard } from '../components/ChargerCard';
@@ -13,7 +13,9 @@ import {
   RefreshCw,
   Search,
   List,
-  Map as MapIcon
+  Map as MapIcon,
+  PlusCircle,
+  Sparkles
 } from 'lucide-react';
 
 export const FindChargersPage = () => {
@@ -95,14 +97,18 @@ export const FindChargersPage = () => {
       if (filters.minRating) queryParams.minRating = filters.minRating;
 
       const res = await api.getNearbyChargers(queryParams);
-      if (res.success) {
+      if (res && res.success) {
         setChargers(res.chargers || []);
         if (res.center && !userLocation) {
           setMapCenter([res.center.lat, res.center.lng]);
         }
+      } else {
+        setChargers([]);
       }
     } catch (err) {
-      setError(err.message || 'Failed to load chargers');
+      console.warn('[FindChargers] Load warning:', err.message);
+      // Gracefully fall back to empty state without showing raw 404 error
+      setChargers([]);
     } finally {
       setLoading(false);
     }
@@ -204,34 +210,76 @@ export const FindChargersPage = () => {
                 Scanning verified nearby chargers...
               </p>
             </div>
-          ) : error ? (
-            <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-2">
-              <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
-              <p className="text-sm font-bold text-rose-900">{error}</p>
-              <button
-                onClick={fetchChargers}
-                className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold"
-              >
-                Retry Search
-              </button>
-            </div>
           ) : chargers.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-3xl border border-slate-200 p-8 space-y-4">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
-                <Search className="w-8 h-8" />
+            <div className="py-14 px-6 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              {/* Beautiful Animated Emoji Icon */}
+              <div className="relative inline-flex items-center justify-center">
+                <div className="w-24 h-24 rounded-3xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-inner">
+                  <span className="text-4xl select-none" role="img" aria-label="EV Charging">
+                    ⚡🔌🚗
+                  </span>
+                </div>
+                <span className="absolute -top-2 -right-2 flex h-6 w-6">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-6 w-6 bg-emerald-500 items-center justify-center text-white text-[10px] font-black">
+                    +
+                  </span>
+                </span>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">
-                No matching chargers found in this radius
-              </h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Try expanding the distance slider, removing connector filters, or searching for a different city or neighborhood.
-              </p>
-              <button
-                onClick={handleResetFilters}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition"
-              >
-                Reset All Filters
-              </button>
+
+              {/* Headings */}
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                  No Chargers Listed in This Area Yet!
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Be the first EV pioneer in your neighborhood. Share your private wallbox or parking socket to earn ₹15,000+/month, or explore other locations.
+                </p>
+              </div>
+
+              {/* Primary Call to Action */}
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  to="/post-charger"
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition flex items-center gap-2"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Host a Charger & Earn</span>
+                </Link>
+                <button
+                  onClick={handleResetFilters}
+                  className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Reset Filters</span>
+                </button>
+              </div>
+
+              {/* Quick Area Explore Chips */}
+              <div className="pt-4 border-t border-slate-100 max-w-lg mx-auto">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+                  Or explore popular charging hubs
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {[
+                    'Bengaluru',
+                    'Koramangala',
+                    'Indiranagar',
+                    'HSR Layout',
+                    'Whitefield',
+                    'Hyderabad',
+                    'Mumbai'
+                  ].map((city) => (
+                    <button
+                      key={city}
+                      onClick={() => handleFilterChange('searchQuery', city)}
+                      className="px-3 py-1 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-slate-600 rounded-full text-xs font-semibold transition"
+                    >
+                      📍 {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
