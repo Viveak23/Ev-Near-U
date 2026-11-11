@@ -69,11 +69,37 @@ export const BookingModal = ({ charger, isOpen, onClose }) => {
       const [hours, minutes] = startTimeStr.split(':');
       const startDateTime = new Date(`${date}T${startTimeStr}:00`);
 
+      const bookingRef = `EVB-${Math.floor(100000 + Math.random() * 900000)}`;
       const payload = {
+        bookingId: bookingRef,
         chargerId: charger._id,
+        charger: {
+          _id: charger._id,
+          title: charger.title,
+          powerKW: charger.powerKW,
+          chargingMethod: charger.chargingMethod,
+          connectorType: charger.connectorType,
+          address: charger.address,
+          approximateArea: charger.approximateArea,
+          pricing: charger.pricing,
+          host: charger.host
+        },
+        user: {
+          firebaseUid: user?.firebaseUid,
+          name: user?.name,
+          email: user?.email,
+          phone: user?.phone
+        },
         startTime: startDateTime.toISOString(),
         durationHours: Number(durationHours),
         estimatedKWh: Number(activeKWh),
+        estimatedCost: {
+          subtotal,
+          platformFee,
+          taxes,
+          totalEstimated
+        },
+        status: 'Confirmed',
         vehicle: selectedVehicle,
         notes
       };

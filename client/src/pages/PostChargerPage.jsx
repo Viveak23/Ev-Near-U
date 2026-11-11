@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Camera,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 
 const PRESET_CHARGER_IMAGES = [
@@ -24,7 +26,7 @@ const PRESET_CHARGER_IMAGES = [
 ];
 
 export const PostChargerPage = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
@@ -58,6 +60,7 @@ export const PostChargerPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [createdListing, setCreatedListing] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -131,6 +134,15 @@ export const PostChargerPage = () => {
         connectorType: formData.connectorType,
         chargingMethod: formData.chargingMethod,
         powerKW: Number(formData.powerKW),
+        host: {
+          _id: user?.firebaseUid || user?.email || 'host_user',
+          firebaseUid: user?.firebaseUid,
+          name: user?.name || 'EV Host',
+          email: user?.email,
+          phone: user?.phone,
+          avatar: user?.avatar
+        },
+        hostId: user?.firebaseUid || user?.email,
         address: {
           street: formData.street,
           landmark: formData.landmark,
@@ -139,6 +151,7 @@ export const PostChargerPage = () => {
           postalCode: formData.postalCode,
           country: 'India'
         },
+        approximateArea: `${formData.landmark ? formData.landmark + ', ' : ''}${formData.city}`,
         latitude: parseFloat(formData.latitude),
         longitude: parseFloat(formData.longitude),
         images: [formData.selectedImage],
@@ -164,13 +177,13 @@ export const PostChargerPage = () => {
         const res = await api.updateCharger(editId, payload);
         if (res.success) {
           setSuccess('Listing updated successfully!');
-          setTimeout(() => navigate('/dashboard?tab=chargers'), 1200);
+          setTimeout(() => navigate('/dashboard?tab=chargers'), 1500);
         }
       } else {
         const res = await api.createCharger(payload);
-        if (res.success) {
-          setSuccess('Charger published successfully! It is now discoverable.');
-          setTimeout(() => navigate('/dashboard?tab=chargers'), 1200);
+        if (res.success && res.charger) {
+          setCreatedListing(res.charger);
+          setSuccess('Successfully listed your charger!');
         }
       }
     } catch (err) {
@@ -179,6 +192,99 @@ export const PostChargerPage = () => {
       setLoading(false);
     }
   };
+
+  if (createdListing) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-emerald-200 shadow-xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          
+          {/* Animated Success Badge */}
+          <div className="relative inline-flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-md">
+              <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+            </div>
+            <span className="absolute -top-1 -right-1 flex h-6 w-6">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-6 w-6 bg-emerald-600 items-center justify-center text-white text-xs">
+                ⚡
+              </span>
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+              Live & Verified
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Successfully Listed Your Charger!
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+              Your charger has been published and is now discoverable on the interactive map for EV drivers.
+            </p>
+          </div>
+
+          {/* Charger Summary Card */}
+          <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200 text-left flex gap-4 items-center">
+            <img
+              src={createdListing.images?.[0] || PRESET_CHARGER_IMAGES[0]}
+              alt=""
+              className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="font-extrabold text-sm text-slate-900 truncate">
+                {createdListing.title}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                📍 {createdListing.address?.street}, {createdListing.address?.city}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                  {createdListing.powerKW} kW {createdListing.chargingMethod}
+                </span>
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-200 text-slate-800">
+                  {createdListing.connectorType}
+                </span>
+                <span className="text-xs font-black text-emerald-700 ml-auto">
+                  ₹{createdListing.pricing?.pricePerKWh}/kWh
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => navigate('/dashboard?tab=chargers')}
+              className="flex-1 py-3 px-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2"
+            >
+              <span>Go to My Charger Listings</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => navigate('/find-chargers')}
+              className="flex-1 py-3 px-5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+            >
+              <span>View on Map</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                setCreatedListing(null);
+                setSuccess('');
+              }}
+              className="text-xs font-bold text-slate-500 hover:text-emerald-700 hover:underline"
+            >
+              + List Another EV Charger
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

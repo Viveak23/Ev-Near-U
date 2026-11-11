@@ -288,6 +288,7 @@ export const FindChargersPage = () => {
                   key={charger._id}
                   charger={charger}
                   onBookNow={(c) => setBookingCharger(c)}
+                  onDelete={(delId) => setChargers((prev) => prev.filter((c) => c._id !== delId))}
                 />
               ))}
             </div>

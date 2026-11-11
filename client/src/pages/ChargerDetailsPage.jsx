@@ -17,7 +17,9 @@ import {
   Car,
   DollarSign,
   Info,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 
 export const ChargerDetailsPage = () => {
@@ -31,6 +33,29 @@ export const ChargerDetailsPage = () => {
   const [error, setError] = useState('');
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isAddressRevealed, setIsAddressRevealed] = useState(false);
+
+  const isOwner = Boolean(
+    user && charger && (
+      (charger.host?.firebaseUid && user.firebaseUid && charger.host.firebaseUid === user.firebaseUid) ||
+      (charger.hostId && user.firebaseUid && charger.hostId === user.firebaseUid) ||
+      (charger.host?.email && user.email && charger.host.email.toLowerCase() === user.email.toLowerCase()) ||
+      (charger.host?._id && user.firebaseUid && charger.host._id === user.firebaseUid)
+    )
+  );
+
+  const handleDeleteCharger = async () => {
+    if (!window.confirm(`Are you sure you want to permanently delete your listing "${charger.title}"?`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await api.deleteCharger(charger._id);
+      navigate('/dashboard?tab=chargers');
+    } catch (err) {
+      alert('Failed to delete charger: ' + err.message);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -85,8 +110,6 @@ export const ChargerDetailsPage = () => {
     );
   }
 
-  const isOwner = user && charger.host?._id === user._id;
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
@@ -123,6 +146,24 @@ export const ChargerDetailsPage = () => {
         {/* Left Column (8 cols) */}
         <div className="lg:col-span-8 space-y-8">
           
+          {/* Host Ownership Banner */}
+          {isOwner && (
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2 text-amber-950 font-bold text-xs sm:text-sm">
+                <Sparkles className="w-4 h-4 fill-amber-500 text-amber-600 shrink-0" />
+                <span>You are the Host of this Charger listing</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDeleteCharger}
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete My Listing</span>
+              </button>
+            </div>
+          )}
+
           {/* Photos Gallery */}
           <div className="relative h-72 sm:h-96 rounded-3xl overflow-hidden bg-slate-100 shadow-sm border border-slate-200">
             <img

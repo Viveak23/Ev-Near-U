@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import {
   Zap,
   MapPin,
@@ -7,11 +9,25 @@ import {
   Star,
   ShieldCheck,
   BatteryCharging,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 
-export const ChargerCard = ({ charger, onBookNow }) => {
+export const ChargerCard = ({ charger, onBookNow, onDelete }) => {
+  const { user } = useAuth();
+  const [isDeleting, setIsDeleting] = useState(false);
+
   if (!charger) return null;
+
+  const isOwner = Boolean(
+    user && (
+      (charger.host?.firebaseUid && user.firebaseUid && charger.host.firebaseUid === user.firebaseUid) ||
+      (charger.hostId && user.firebaseUid && charger.hostId === user.firebaseUid) ||
+      (charger.host?.email && user.email && charger.host.email.toLowerCase() === user.email.toLowerCase()) ||
+      (charger.host?._id && user.firebaseUid && charger.host._id === user.firebaseUid)
+    )
+  );
 
   const isDC = charger.chargingMethod === 'DC';
   const hasTimeFee = charger.pricing?.timeFeeEnabled && charger.pricing?.pricePerHour > 0;
@@ -23,8 +39,24 @@ export const ChargerCard = ({ charger, onBookNow }) => {
   const formattedEstTime =
     estMins < 60 ? `${estMins} mins` : `${Math.floor(estMins / 60)}h ${estMins % 60}m`;
 
+  const handleDeleteListing = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete your charger "${charger.title}"? This will remove it from all listings.`)) {
+      try {
+        setIsDeleting(true);
+        await api.deleteCharger(charger._id);
+        if (onDelete) onDelete(charger._id);
+      } catch (err) {
+        alert('Failed to delete charger: ' + err.message);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col group">
+    <div className={`bg-white rounded-2xl border ${isOwner ? 'border-amber-300 ring-2 ring-amber-400/20 shadow-sm' : 'border-slate-200 shadow-xs'} hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col group`}>
       
       {/* Image Banner */}
       <div className="relative h-48 w-full overflow-hidden bg-slate-100">
@@ -39,7 +71,13 @@ export const ChargerCard = ({ charger, onBookNow }) => {
         />
 
         {/* Top Badges */}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 items-center">
+          {isOwner && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-black text-amber-950 bg-amber-400 shadow-sm backdrop-blur flex items-center gap-1 border border-amber-300">
+              <Sparkles className="w-3.5 h-3.5 fill-amber-950" />
+              <span>Your Charger</span>
+            </span>
+          )}
           <span
             className={`px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-sm backdrop-blur flex items-center gap-1 ${
               isDC ? 'bg-sky-600/90' : 'bg-emerald-600/90'
@@ -117,7 +155,19 @@ export const ChargerCard = ({ charger, onBookNow }) => {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {isOwner && (
+              <button
+                type="button"
+                onClick={handleDeleteListing}
+                disabled={isDeleting}
+                title="Delete this listing"
+                className="px-2.5 py-2 text-xs font-bold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-xl transition flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
+              </button>
+            )}
             <Link
               to={`/charger/${charger._id}`}
               className="px-3 py-2 text-xs font-semibold text-slate-700 hover:text-emerald-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
@@ -126,7 +176,7 @@ export const ChargerCard = ({ charger, onBookNow }) => {
             </Link>
             <button
               onClick={() => onBookNow ? onBookNow(charger) : null}
-              className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-xs flex items-center gap-1"
+              className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-xs flex items-center gap-1"
             >
               <span>Book</span>
               <ArrowRight className="w-3.5 h-3.5" />
