@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
-import { Star, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Star, X, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const ReviewModal = ({ session, isOpen, onClose, onReviewSubmitted }) => {
   const [rating, setRating] = useState(5);
@@ -15,7 +15,7 @@ export const ReviewModal = ({ session, isOpen, onClose, onReviewSubmitted }) => 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!comment.trim()) {
-      setError('Please provide feedback about your charging experience.');
+      setError('Please provide a brief feedback about your charging experience.');
       return;
     }
 
@@ -25,16 +25,19 @@ export const ReviewModal = ({ session, isOpen, onClose, onReviewSubmitted }) => 
 
       const res = await api.submitReview({
         sessionId: session._id,
+        chargerId: session.charger?._id || session.chargerId || (typeof session.charger === 'string' ? session.charger : undefined),
         rating,
         comment: comment.trim()
       });
 
-      if (res.success && res.review) {
+      if (res && (res.success || res.review)) {
         setSuccess(true);
-        if (onReviewSubmitted) onReviewSubmitted(res.review);
+        if (onReviewSubmitted) onReviewSubmitted(res.review || res);
         setTimeout(() => {
           onClose();
         }, 1500);
+      } else {
+        setError(res?.message || 'Failed to submit review. Please retry.');
       }
     } catch (err) {
       setError(err.message || 'Failed to submit review.');
@@ -44,12 +47,17 @@ export const ReviewModal = ({ session, isOpen, onClose, onReviewSubmitted }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative animate-in fade-in zoom-in-95 duration-200">
         
+        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+          aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
@@ -60,13 +68,25 @@ export const ReviewModal = ({ session, isOpen, onClose, onReviewSubmitted }) => 
               Rate Your Charging Session
             </h3>
             <p className="text-xs text-slate-500 mt-1 mb-5">
-              Charger: <span className="font-semibold text-slate-700">{session.charger?.title}</span> • Host: <span className="font-semibold text-slate-700">{session.host?.name}</span>
+              Charger: <span className="font-semibold text-slate-700">{session.charger?.title || 'EV Charger'}</span>
+              {session.host?.name && (
+                <> • Host: <span className="font-semibold text-slate-700">{session.host.name}</span></>
+              )}
             </p>
 
             {error && (
-              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                <div className="flex-1">
+                  <span>{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => setError('')}
+                    className="block mt-1 font-bold text-rose-600 underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             )}
 
@@ -124,9 +144,16 @@ export const ReviewModal = ({ session, isOpen, onClose, onReviewSubmitted }) => 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2"
               >
-                {loading ? 'Submitting Review...' : 'Submit Verified Review'}
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Submitting Review...</span>
+                  </>
+                ) : (
+                  <span>Submit Verified Review</span>
+                )}
               </button>
             </form>
           </div>

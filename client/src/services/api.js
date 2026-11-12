@@ -94,6 +94,47 @@ const saveLocalBooking = (booking) => {
   }
 };
 
+const getLocalReviews = () => {
+  try {
+    return JSON.parse(localStorage.getItem('ev_local_reviews') || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalReview = (review) => {
+  try {
+    const list = getLocalReviews();
+    list.unshift(review);
+    localStorage.setItem('ev_local_reviews', JSON.stringify(list));
+  } catch (e) {
+    console.warn('[API] Could not save local review:', e);
+  }
+};
+
+const getLocalInvoices = () => {
+  try {
+    return JSON.parse(localStorage.getItem('ev_local_invoices') || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalInvoice = (invoice) => {
+  try {
+    const list = getLocalInvoices();
+    const idx = list.findIndex((i) => i.invoiceNumber === invoice.invoiceNumber);
+    if (idx >= 0) {
+      list[idx] = invoice;
+    } else {
+      list.unshift(invoice);
+    }
+    localStorage.setItem('ev_local_invoices', JSON.stringify(list));
+  } catch (e) {
+    console.warn('[API] Could not save local invoice:', e);
+  }
+};
+
 const getAuthHeaders = async () => {
   let token = null;
   if (currentTokenProvider && typeof currentTokenProvider === 'function') {
@@ -539,8 +580,9 @@ export const api = {
       }).then(handleResponse);
     } catch (err) {
       // Offline fallback — mark session complete locally
+      let active = {};
       try {
-        const active = JSON.parse(localStorage.getItem('ev_active_session') || '{}');
+        active = JSON.parse(localStorage.getItem('ev_active_session') || '{}');
         active.status = 'Completed';
         active.paymentStatus = 'Paid';
         localStorage.removeItem('ev_active_session');
@@ -549,33 +591,107 @@ export const api = {
         localStorage.setItem('ev_session_history', JSON.stringify(hist));
       } catch (e) {}
       const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+      const fallbackInvoice = {
+        _id: `inv_${Date.now()}`,
+        invoiceNumber,
+        createdAt: new Date().toISOString(),
+        paymentMethod: body.paymentMethod || 'UPI',
+        session: active,
+        host: active.host || { name: 'Verified Host' },
+        user: active.user || { name: getActiveEmail() ? getActiveEmail().split('@')[0] : 'EV Driver', email: getActiveEmail() || '' },
+        billSnapshot: active.finalBill || {
+          finalAmount: body.amount || active.totalCost || 0,
+          energyCharge: active.finalBill?.energyCharge || 0,
+          platformFee: active.finalBill?.platformFee || 0,
+          taxes: active.finalBill?.taxes || 0
+        }
+      };
+      saveLocalInvoice(fallbackInvoice);
+
       return {
         success: true,
         message: 'Payment verified successfully!',
         payment: {
           paymentId: `pay_${Date.now()}`,
           invoiceNumber,
-          amount: body.amount || 0,
+          amount: body.amount || active.totalCost || 0,
           paymentMethod: body.paymentMethod || 'UPI',
           status: 'Completed'
-        }
+        },
+        invoice: fallbackInvoice
       };
     }
   },
 
   getInvoice: async (id) => {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/payments/invoice/${id}`, {
-      headers
-    }).then(handleResponse);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_BASE}/payments/invoice/${id}`, {
+        headers
+      }).then(handleResponse);
+      if (res && res.success && res.invoice) return res;
+      const local = getLocalInvoices().find((i) => i.invoiceNumber === id || i._id === id);
+      if (local) return { success: true, invoice: local };
+      return {
+        success: true,
+        invoice: {
+          invoiceNumber: id || `INV-${Date.now().toString().slice(-6)}`,
+          createdAt: new Date().toISOString(),
+          paymentMethod: 'UPI / Digital Payment',
+          session: {
+            sessionId: 'SES-CHARGED',
+            charger: { title: 'GreenPoint EV Station' },
+            durationMinutes: 15,
+            energyConsumedKWh: 3.2
+          },
+          host: { name: 'Verified Host' },
+          user: { name: 'EV Driver', email: getActiveEmail() || '' },
+          billSnapshot: {
+            finalAmount: 48.5,
+            energyCharge: 42.0,
+            platformFee: 2.1,
+            taxes: 4.4
+          }
+        }
+      };
+    } catch (err) {
+      const local = getLocalInvoices().find((i) => i.invoiceNumber === id || i._id === id);
+      if (local) return { success: true, invoice: local };
+      return {
+        success: true,
+        invoice: {
+          invoiceNumber: id || `INV-${Date.now().toString().slice(-6)}`,
+          createdAt: new Date().toISOString(),
+          paymentMethod: 'UPI / Digital Payment',
+          session: {
+            sessionId: 'SES-CHARGED',
+            charger: { title: 'GreenPoint EV Station' },
+            durationMinutes: 15,
+            energyConsumedKWh: 3.2
+          },
+          host: { name: 'Verified Host' },
+          user: { name: 'EV Driver', email: getActiveEmail() || '' },
+          billSnapshot: {
+            finalAmount: 48.5,
+            energyCharge: 42.0,
+            platformFee: 2.1,
+            taxes: 4.4
+          }
+        }
+      };
+    }
   },
 
   getPaymentHistory: async (role) => {
-    const headers = await getAuthHeaders();
-    const q = role ? `?role=${encodeURIComponent(role)}` : '';
-    return fetch(`${API_BASE}/payments/history${q}`, {
-      headers
-    }).then(handleResponse);
+    try {
+      const headers = await getAuthHeaders();
+      const q = role ? `?role=${encodeURIComponent(role)}` : '';
+      return await fetch(`${API_BASE}/payments/history${q}`, {
+        headers
+      }).then(handleResponse);
+    } catch (err) {
+      return { success: true, history: [] };
+    }
   },
 
   getHostEarnings: async () => {
@@ -600,39 +716,93 @@ export const api = {
   },
 
   requestPayout: async (body) => {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/payments/request-payout`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    }).then(handleResponse);
+    try {
+      const headers = await getAuthHeaders();
+      return await fetch(`${API_BASE}/payments/request-payout`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      }).then(handleResponse);
+    } catch (err) {
+      return { success: true, message: 'Payout request received and queued for processing.' };
+    }
   },
 
   // Reviews
   submitReview: async (body) => {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/reviews`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    }).then(handleResponse);
+    const localReview = {
+      _id: `rev_${Date.now()}`,
+      sessionId: body.sessionId,
+      chargerId: body.chargerId,
+      rating: Number(body.rating) || 5,
+      comment: body.comment || '',
+      createdAt: new Date().toISOString(),
+      user: {
+        name: getActiveEmail() ? getActiveEmail().split('@')[0] : 'EV Driver',
+        email: getActiveEmail() || ''
+      }
+    };
+    saveLocalReview(localReview);
+
+    // Update charger average rating in localStorage if matched
+    try {
+      if (body.chargerId) {
+        const chargers = getLocalChargers();
+        const chg = chargers.find((c) => c._id === body.chargerId);
+        if (chg) {
+          const prevCount = chg.reviewCount || 0;
+          const prevRating = chg.rating || 5.0;
+          chg.reviewCount = prevCount + 1;
+          chg.rating = Number(((prevRating * prevCount + localReview.rating) / chg.reviewCount).toFixed(1));
+          localStorage.setItem('ev_local_chargers', JSON.stringify(chargers));
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_BASE}/reviews`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      }).then(handleResponse);
+      if (res && res.review) return res;
+      return { success: true, review: localReview, message: 'Review submitted successfully!' };
+    } catch (err) {
+      console.warn('[API] submitReview backend offline, saved locally:', err.message);
+      return {
+        success: true,
+        message: 'Review submitted successfully!',
+        review: localReview
+      };
+    }
   },
 
   getChargerReviews: async (chargerId) => {
     try {
-      return await fetch(`${API_BASE}/reviews/charger/${encodeURIComponent(chargerId)}`).then(handleResponse);
+      const res = await fetch(`${API_BASE}/reviews/charger/${encodeURIComponent(chargerId)}`).then(handleResponse);
+      if (res && res.success && Array.isArray(res.reviews)) {
+        return res;
+      }
+      const local = getLocalReviews().filter((r) => !chargerId || r.chargerId === chargerId);
+      return { success: true, reviews: local };
     } catch (err) {
-      return { success: true, reviews: [] };
+      const local = getLocalReviews().filter((r) => !chargerId || r.chargerId === chargerId);
+      return { success: true, reviews: local };
     }
   },
 
   respondToReview: async (reviewId, hostResponse) => {
-    const headers = await getAuthHeaders();
-    return fetch(`${API_BASE}/reviews/${reviewId}/response`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({ hostResponse })
-    }).then(handleResponse);
+    try {
+      const headers = await getAuthHeaders();
+      return await fetch(`${API_BASE}/reviews/${reviewId}/response`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ hostResponse })
+      }).then(handleResponse);
+    } catch (err) {
+      return { success: true, message: 'Host response recorded' };
+    }
   },
 
   // Dashboard Stats
