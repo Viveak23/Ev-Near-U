@@ -103,6 +103,11 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/account" element={<Navigate to="/profile" replace />} />
+                {/* Common URL aliases so old links / bookmarks still work */}
+                <Route path="/host-a-charger" element={<Navigate to="/post-charger" replace />} />
+                <Route path="/host" element={<Navigate to="/post-charger" replace />} />
+                <Route path="/chargers" element={<Navigate to="/find-chargers" replace />} />
+                <Route path="/map" element={<Navigate to="/find-chargers" replace />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
