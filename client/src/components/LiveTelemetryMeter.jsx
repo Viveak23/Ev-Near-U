@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Zap,
   Clock,
@@ -11,14 +12,20 @@ import {
   StopCircle,
   Edit3,
   Sliders,
-  DollarSign
+  DollarSign,
+  CreditCard,
+  CheckCircle2,
+  Star,
+  Receipt
 } from 'lucide-react';
 
 export const LiveTelemetryMeter = ({
   session,
   isHost = false,
   onStopSession,
-  onUpdateManualReadings
+  onUpdateManualReadings,
+  onOpenPayment,
+  onOpenReview
 }) => {
   if (!session) return null;
 
@@ -295,39 +302,92 @@ export const LiveTelemetryMeter = ({
         </div>
       </div>
 
-      {/* Control Actions */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsPaused(!isPaused)}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition ${
-              isPaused
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-            <span>{isPaused ? 'Resume Charging' : 'Pause Flow'}</span>
-          </button>
+      {/* Control Actions & Status-Specific CTAs */}
+      {session.status === 'In Progress' && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition ${
+                isPaused
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              <span>{isPaused ? 'Resume Charging' : 'Pause Flow'}</span>
+            </button>
 
+            <button
+              onClick={() => setIsManualMode(!isManualMode)}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 flex items-center gap-2 transition"
+            >
+              <Sliders className="w-4 h-4" />
+              <span>Switch to {isManualMode ? 'Simulated Telemetry' : 'Manual Entry'}</span>
+            </button>
+          </div>
+
+          {/* STOP CHARGING BUTTON */}
           <button
-            onClick={() => setIsManualMode(!isManualMode)}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 flex items-center gap-2 transition"
+            onClick={() => onStopSession && onStopSession(energyConsumedKWh)}
+            className="w-full sm:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-rose-600/20 transition flex items-center justify-center gap-2"
           >
-            <Sliders className="w-4 h-4" />
-            <span>Switch to {isManualMode ? 'Simulated Telemetry' : 'Manual Entry'}</span>
+            <StopCircle className="w-5 h-5" />
+            <span>Stop Charging & Generate Final Bill</span>
           </button>
         </div>
+      )}
 
-        {/* STOP CHARGING BUTTON */}
-        <button
-          onClick={() => onStopSession && onStopSession(energyConsumedKWh)}
-          className="w-full sm:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-rose-600/20 transition flex items-center justify-center gap-2"
-        >
-          <StopCircle className="w-5 h-5" />
-          <span>Stop Charging & Generate Final Bill</span>
-        </button>
-      </div>
+      {session.status === 'Payment Pending' && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100 bg-amber-50/70 -mx-6 -mb-6 sm:-mx-8 sm:-mb-8 p-6 rounded-b-3xl">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping"></span>
+            <div>
+              <p className="text-xs font-bold text-amber-900">Charging Stopped • Final Bill Ready</p>
+              <p className="text-[11px] text-amber-700">Total {energyConsumedKWh.toFixed(2)} kWh delivered ({formatTime(elapsedSeconds)})</p>
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenPayment}
+            className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-extrabold shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+          >
+            <CreditCard className="w-5 h-5" />
+            <span>Pay Final Bill (₹{runningTotalCost.toFixed(2)})</span>
+          </button>
+        </div>
+      )}
+
+      {session.status === 'Completed' && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100 bg-emerald-50/70 -mx-6 -mb-6 sm:-mx-8 sm:-mb-8 p-6 rounded-b-3xl">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-emerald-900">Charging Session Completed & Paid</p>
+              <p className="text-[11px] text-emerald-700">Thank you for charging on the EvNearU network!</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={onOpenReview}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Star className="w-4 h-4 fill-white" />
+              <span>Rate Session</span>
+            </button>
+            <Link
+              to={`/invoice/${session.invoiceNumber || session.paymentId?.invoiceNumber || session.sessionId || 'INV-674729'}`}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Receipt className="w-4 h-4" />
+              <span>View Tax Invoice</span>
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

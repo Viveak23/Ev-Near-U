@@ -124,7 +124,7 @@ export const Navbar = () => {
             {/* Live Active Session Indicator Badge */}
             {activeSession && (
               <Link
-                to={`/session/${activeSession._id}`}
+                to={`/session/${activeSession._id || 'live'}`}
                 className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-full text-xs font-semibold shadow-md shadow-emerald-600/30 pulse-charging hover:bg-emerald-700 transition"
                 title="Active Charging Session in progress"
               >
@@ -302,7 +302,7 @@ export const Navbar = () => {
           <div className="flex md:hidden items-center gap-2">
             {activeSession && (
               <Link
-                to={`/session/${activeSession._id}`}
+                to={`/session/${activeSession._id || 'live'}`}
                 className="p-2 bg-emerald-600 text-white rounded-full pulse-charging"
               >
                 <BatteryCharging className="w-5 h-5" />

@@ -44,7 +44,7 @@ export const LiveSessionPage = () => {
         setLoading(true);
         setError('');
 
-        if (id && id !== 'live') {
+        if (id && id !== 'live' && id !== 'undefined') {
           // Fetch existing session by session _id
           const res = await api.getSessionById(id);
           if (res.success && res.session) {
@@ -53,7 +53,12 @@ export const LiveSessionPage = () => {
               setIsPaymentOpen(true);
             }
           } else {
-            setError('Session not found');
+            const activeRes = await api.getActiveSession();
+            if (activeRes.success && activeRes.session) {
+              setSession(activeRes.session);
+            } else {
+              setError('Session not found');
+            }
           }
         } else if (bookingId) {
           // Start or resume session from confirmed bookingId
@@ -80,19 +85,29 @@ export const LiveSessionPage = () => {
         console.warn('[LiveSession] Error loading charging session, activating live fallback session:', err.message);
         const bookings = JSON.parse(localStorage.getItem('ev_local_bookings') || '[]');
         const b = bookings.find((x) => x._id === bookingId || x.bookingId === bookingId) || bookings[0];
+        const sid = `ses_${Date.now()}`;
+        const sessionCode = `SES-${Date.now().toString().slice(-6)}`;
         const fallbackSession = {
-          _id: `ses_${Date.now()}`,
+          _id: sid,
+          sessionId: sessionCode,
           bookingId: bookingId || b?._id,
           booking: b || {},
-          charger: b?.charger || {},
+          charger: b?.charger || {
+            title: 'GreenPoint EV Station',
+            powerKW: 11,
+            pricing: { pricePerKWh: 14.5, pricePerHour: 0 }
+          },
+          host: b?.charger?.host || { name: 'Verified EV Host' },
+          user: b?.user || { name: user?.name || 'EV Driver', email: user?.email || '' },
           status: 'In Progress',
           startTime: new Date().toISOString(),
           initialSOC: 22,
           currentSOC: 22,
           targetSOC: 90,
-          powerOutputKW: b?.charger?.powerKW || 7.4,
-          totalEnergyConsumedKWh: 0.2,
-          pricingSnapshot: b?.charger?.pricing || { pricePerKWh: 15, pricePerHour: 0 },
+          powerOutputKW: b?.charger?.powerKW || 11,
+          totalEnergyConsumedKWh: 0.8,
+          energyConsumedKWh: 0.8,
+          pricingSnapshot: b?.charger?.pricing || { pricePerKWh: 14.5, pricePerHour: 0 },
           paymentStatus: 'Pending',
           createdAt: new Date().toISOString()
         };
@@ -205,6 +220,8 @@ export const LiveSessionPage = () => {
         isHost={isHost}
         onStopSession={handleStopSession}
         onUpdateManualReadings={handleUpdateManual}
+        onOpenPayment={() => setIsPaymentOpen(true)}
+        onOpenReview={() => setIsReviewOpen(true)}
       />
 
       {/* Payment Modal */}
@@ -218,7 +235,8 @@ export const LiveSessionPage = () => {
             ...prev,
             status: 'Completed',
             paymentStatus: 'Paid',
-            paymentId: pay
+            paymentId: pay,
+            invoiceNumber: pay.invoiceNumber || pay.paymentId
           }));
           setIsPaymentOpen(false);
           // Suggest leaving a review
