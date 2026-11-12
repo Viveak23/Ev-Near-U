@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '../config/firebase';
 import { api, setTokenProvider } from '../services/api';
+import { setCurrentUser as setApiCurrentUser } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -55,6 +56,9 @@ export const AuthProvider = ({ children }) => {
             const idToken = await currentFirebaseUser.getIdToken();
             localStorage.setItem('ev_token', idToken);
 
+            // Track identity in api.js for localStorage scoping
+            setApiCurrentUser(currentFirebaseUser.uid, currentFirebaseUser.email || '');
+
             // Retrieve or sync MongoDB user record
             const res = await api.getMe();
             if (res.success && res.user) {
@@ -82,6 +86,7 @@ export const AuthProvider = ({ children }) => {
           }
         } else {
           localStorage.removeItem('ev_token');
+          setApiCurrentUser(null, null); // Clear per-user localStorage scoping
           setUser(null);
         }
         setLoading(false);
@@ -287,6 +292,7 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
     } finally {
       localStorage.removeItem('ev_token');
+      setApiCurrentUser(null, null); // Clear per-user scoping
       setFirebaseUser(null);
       setUser(null);
     }

@@ -10,6 +10,48 @@ export const setTokenProvider = (provider) => {
   currentTokenProvider = provider;
 };
 
+// ─── Per-user identity tracking (for localStorage scoping) ─────────────────
+let _activeUid = null;
+let _activeEmail = null;
+
+/** Called by AuthContext whenever the signed-in user changes. */
+export const setCurrentUser = (uid, email) => {
+  _activeUid = uid || null;
+  _activeEmail = (email || '').toLowerCase() || null;
+  if (uid) {
+    localStorage.setItem('ev_active_uid', uid);
+    localStorage.setItem('ev_active_email', (email || '').toLowerCase());
+  } else {
+    localStorage.removeItem('ev_active_uid');
+    localStorage.removeItem('ev_active_email');
+  }
+};
+
+const getActiveUid = () => _activeUid || localStorage.getItem('ev_active_uid') || null;
+const getActiveEmail = () => _activeEmail || localStorage.getItem('ev_active_email') || null;
+
+/** Returns true if the given charger was created by the currently signed-in user. */
+const isChargerOwner = (charger) => {
+  const uid = getActiveUid();
+  const email = getActiveEmail();
+  if (!charger) return false;
+  return Boolean(
+    (uid && (charger.host?.firebaseUid === uid || charger.hostId === uid)) ||
+    (email && charger.host?.email?.toLowerCase() === email)
+  );
+};
+
+/** Returns true if the given booking was created by the currently signed-in user. */
+const isBookingOwner = (booking) => {
+  const uid = getActiveUid();
+  const email = getActiveEmail();
+  if (!booking) return false;
+  return Boolean(
+    (uid && (booking.user?.firebaseUid === uid || booking.userId === uid)) ||
+    (email && booking.user?.email?.toLowerCase() === email)
+  );
+};
+
 // Local storage helpers for seamless offline/static hosting resilience (e.g. GitHub Pages)
 const getLocalChargers = () => {
   try {
@@ -187,10 +229,15 @@ export const api = {
   },
 
   createCharger: async (body) => {
+    const uid = getActiveUid();
+    const email = getActiveEmail();
     const newId = `chg_${Date.now()}`;
     const localObj = {
       _id: newId,
       ...body,
+      // Stamp host identity so ownership checks always work
+      hostId: uid || body.hostId,
+      host: body.host || { firebaseUid: uid, email: email },
       rating: 5.0,
       reviewCount: 0,
       createdAt: new Date().toISOString()
@@ -233,14 +280,21 @@ export const api = {
 
   deleteCharger: async (id) => {
     try {
-      const list = getLocalChargers().filter((c) => c._id !== id);
-      localStorage.setItem('ev_local_chargers', JSON.stringify(list));
+      // Enforce ownership before deleting from localStorage
+      const allChargers = getLocalChargers();
+      const target = allChargers.find((c) => c._id === id);
+      if (target && !isChargerOwner(target)) {
+        throw new Error('You do not have permission to delete this listing.');
+      }
+      const updated = allChargers.filter((c) => c._id !== id);
+      localStorage.setItem('ev_local_chargers', JSON.stringify(updated));
       const headers = await getAuthHeaders();
       return await fetch(`${API_BASE}/chargers/${id}`, {
         method: 'DELETE',
         headers
       }).then(handleResponse);
     } catch (err) {
+      if (err.message && err.message.includes('permission')) throw err;
       return { success: true, message: 'Charger deleted successfully' };
     }
   },
@@ -254,9 +308,10 @@ export const api = {
       if (res && res.success && res.chargers) {
         return res;
       }
-      return { success: true, chargers: getLocalChargers() };
+      // Filter localStorage to only this user's chargers
+      return { success: true, chargers: getLocalChargers().filter(isChargerOwner) };
     } catch (err) {
-      return { success: true, chargers: getLocalChargers() };
+      return { success: true, chargers: getLocalChargers().filter(isChargerOwner) };
     }
   },
 
@@ -272,9 +327,14 @@ export const api = {
   },
 
   createBooking: async (body) => {
+    const uid = getActiveUid();
+    const email = getActiveEmail();
     const bookingObj = {
       _id: `bkg_${Date.now()}`,
       ...body,
+      // Always stamp the booking with the current user's identity for filtering
+      userId: uid || body.userId,
+      user: body.user || { firebaseUid: uid, email: email },
       status: 'Confirmed',
       createdAt: new Date().toISOString()
     };
@@ -299,9 +359,10 @@ export const api = {
         headers
       }).then(handleResponse);
       if (res && res.success && res.bookings) return res;
-      return { success: true, bookings: getLocalBookings() };
+      // Filter localStorage to only this user's bookings
+      return { success: true, bookings: getLocalBookings().filter(isBookingOwner) };
     } catch (err) {
-      return { success: true, bookings: getLocalBookings() };
+      return { success: true, bookings: getLocalBookings().filter(isBookingOwner) };
     }
   },
 
