@@ -519,13 +519,12 @@ export const api = {
         body: JSON.stringify(body)
       }).then(handleResponse);
     } catch (err) {
+      // Offline fallback — return shape that PaymentModal expects
+      const orderId = `order_${Date.now()}`;
+      const paymentDocId = `pdoc_${Date.now()}`;
       return {
         success: true,
-        order: {
-          id: `order_${Date.now()}`,
-          amount: (body.amount || 100) * 100,
-          currency: 'INR'
-        }
+        order: { orderId, paymentDocId, amount: (body.amount || 0) * 100, currency: 'INR' }
       };
     }
   },
@@ -539,22 +538,26 @@ export const api = {
         body: JSON.stringify(body)
       }).then(handleResponse);
     } catch (err) {
-      let active = JSON.parse(localStorage.getItem('ev_active_session') || '{}');
-      active.status = 'Completed';
-      active.paymentStatus = 'Paid';
-      localStorage.removeItem('ev_active_session');
+      // Offline fallback — mark session complete locally
       try {
+        const active = JSON.parse(localStorage.getItem('ev_active_session') || '{}');
+        active.status = 'Completed';
+        active.paymentStatus = 'Paid';
+        localStorage.removeItem('ev_active_session');
         const hist = JSON.parse(localStorage.getItem('ev_session_history') || '[]');
         hist.unshift(active);
         localStorage.setItem('ev_session_history', JSON.stringify(hist));
       } catch (e) {}
+      const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
       return {
         success: true,
         message: 'Payment verified successfully!',
-        invoice: {
-          invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
-          amount: active.totalCost || 250,
-          date: new Date().toLocaleDateString()
+        payment: {
+          paymentId: `pay_${Date.now()}`,
+          invoiceNumber,
+          amount: body.amount || 0,
+          paymentMethod: body.paymentMethod || 'UPI',
+          status: 'Completed'
         }
       };
     }
